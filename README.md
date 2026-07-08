@@ -24,12 +24,16 @@ SpatialVision/
 ├── notebooks/
 │   └── SV01_data_loading_qc.ipynb   # Data loading, QC, clustering, marker validation
 ├── data/
-│   ├── raw/valdeolivas_2024/        # Space Ranger outputs + pathologist annotations
-│   └── processed/                   # Filtered AnnData and QC tables
+│   ├── raw/valdeolivas_2024/        # Downloaded from Zenodo (gitignored)
+│   └── processed/                   # Notebook outputs (gitignored except small CSVs)
 ├── reports/
 │   └── figures/SV01/                # QC and validation figures
-└── requirements.txt                 # Pinned Python environment
+├── requirements.txt                 # Pinned Python environment
+└── .gitignore                       # Excludes raw downloads and large .h5ad files
 ```
+
+> **Note:** Raw Visium data (~1.5 GB) and processed AnnData (~1.2 GB) are **not stored in git**.
+> Run the download cell in `SV01_data_loading_qc.ipynb` to fetch data from Zenodo locally.
 
 ## Setup
 
@@ -110,4 +114,4 @@ Will refine Leiden clusters into biologically annotated spatial niches using Squ
 | `c2dc994` | Formatting fixes; empty code cell |
 | `a98551c` | Execution count cleanup; PCA variance figure update |
 
-Working tree is currently clean on `main`.
+Large data files are excluded via `.gitignore` to keep the repository pushable to GitHub.
