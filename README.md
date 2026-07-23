@@ -6,11 +6,13 @@ Computational oncology portfolio project for spatial transcriptomics analysis of
 
 ## Overview
 
-SpatialVision analyzes 10x Visium spatial transcriptomics data to validate data quality, map tissue architecture, and identify spatially coherent biological signal in colorectal cancer. The pipeline uses `SpatialData` as the unified data container, with `scanpy` for single-cell-style analysis and `squidpy` for spatial statistics.
+SpatialVision analyzes 10x Visium spatial transcriptomics data to map colorectal cancer tissue architecture and identify spatially coherent immune-exclusion programs. The pipeline uses `SpatialData` as the unified data container, with `scanpy` for single-cell-style analysis, `squidpy` for spatial statistics, and `gseapy` / `decoupler` for pathway enrichment.
+
+**Current status:** SV01–SV03 complete. SV04 (cell-type deconvolution) is next.
 
 ## Dataset
 
-**Valdeolivas et al. 2024** - *npj Precision Oncology*
+**Valdeolivas et al. 2024** — *npj Precision Oncology*
 
 - **Zenodo:** [doi:10.5281/zenodo.7760264](https://doi.org/10.5281/zenodo.7760264)
 - **Samples:** 14 Visium sections (7 patients × 2 technical replicates)
@@ -22,17 +24,20 @@ SpatialVision analyzes 10x Visium spatial transcriptomics data to validate data 
 ```
 SpatialVision/
 ├── notebooks/
-│   └── SV01_data_loading_qc.ipynb   # Data loading, QC, clustering, marker validation
+│   ├── SV01_data_loading_qc.ipynb
+│   ├── SV02_spatial_architecture_niche_identification.ipynb
+│   └── SV03_spatially_variable_genes.ipynb
 ├── data/
-│   ├── raw/valdeolivas_2024/        # Downloaded from Zenodo (gitignored)
-│   └── processed/                   # Notebook outputs (gitignored except small CSVs)
+│   ├── raw/valdeolivas_2024/          # Downloaded from Zenodo (gitignored)
+│   └── processed/                     # Large .h5ad outputs gitignored;
+│                                      # small CSVs tracked
 ├── reports/
-│   └── figures/SV01/                # QC and validation figures
-├── requirements.txt                 # Pinned Python environment
-└── .gitignore                       # Excludes raw downloads and large .h5ad files
+│   └── figures/SV01|SV02|SV03/        # QC, niche, and SVG figures
+├── requirements.txt
+└── .gitignore
 ```
 
-> **Note:** Raw Visium data (~1.5 GB) and processed AnnData (~1.2 GB) are **not stored in git**.
+> **Note:** Raw Visium data (~1.5 GB) and processed AnnData files are **not stored in git**.
 > Run the download cell in `SV01_data_loading_qc.ipynb` to fetch data from Zenodo locally.
 
 ## Setup
@@ -52,11 +57,11 @@ pip install -r requirements.txt
 | spatialdata | 0.8.0 | Unified spatial omics container |
 | spatialdata-io | 0.7.1 | Visium data loading |
 | scanpy | 1.12.2 | QC, normalization, PCA, UMAP, clustering |
-| squidpy | 1.8.3 | Spatial statistics and visualization |
-| scikit-misc | 0.5.2 | Seurat v3 HVG selection (`flavor='seurat_v3'`) |
+| squidpy | 1.8.3 | Spatial neighborhood graphs, Moran's I |
+| scikit-misc | 0.5.2 | Seurat v3 HVG selection |
 | leidenalg | 0.12.0 | Leiden clustering |
-
-Launch Jupyter from the `notebooks/` directory so relative paths resolve correctly:
+| gseapy | 1.3.0 | Hallmark pathway enrichment |
+| decoupler | 2.1.6 | PROGENy pathway activity scoring |
 
 ```bash
 cd notebooks
@@ -65,13 +70,24 @@ jupyter lab
 
 Select the `spatialvision` conda environment as the kernel.
 
-## Notebooks
+## Pipeline
 
-### SV01 - Data Loading & Quality Control
+| Notebook | Status | Focus |
+|----------|--------|-------|
+| **SV01** Data Loading & QC | Done | Load Visium, QC, normalize, HVG, UMAP, Leiden |
+| **SV02** Spatial Architecture & Niches | Done | Neighborhood enrichment, Moran's I, 8 spatial niches |
+| **SV03** Spatially Variable Genes | Done | Niche DE, Hallmark GSEA, PROGENy, exclusion signature |
+| **SV04** Cell Type Deconvolution | Planned | Cell2Location with FFPE scRNA-seq reference |
+| **SV05** Cell–Cell Communication | Planned | LIANA ligand–receptor analysis |
+| **SV06** Predictive Modeling | Planned | SHAP validation of exclusion programs |
+
+---
+
+### SV01 — Data Loading & Quality Control
 
 **File:** `notebooks/SV01_data_loading_qc.ipynb`
 
-Validates that the dataset is technically sound and captures biologically coherent spatial signal before downstream analysis.
+Validates technical quality and confirms biologically coherent spatial signal before niche analysis.
 
 | Section | Description |
 |---------|-------------|
@@ -85,33 +101,66 @@ Validates that the dataset is technically sound and captures biologically cohere
 | 8. Marker Validation | EPCAM, CD3E, ACTA2 spatial expression |
 | 9–11. Summary & Save | QC metrics, biological interpretation |
 
-**Outputs:**
+**Outputs:** `SV01_adata_filtered.h5ad`, `SV01_qc_metrics.csv`, `reports/figures/SV01/*.png`
 
-| File | Description |
-|------|-------------|
-| `data/processed/SV01_adata_filtered.h5ad` | Filtered, normalized AnnData (all samples) |
-| `data/processed/SV01_qc_metrics.csv` | Per-spot QC metrics and metadata |
-| `reports/figures/SV01/*.png` | QC distributions, UMAP, marker plots |
+**Key findings:**
+- QC within expected Visium ranges (mean UMI ~11,000; mitochondrial fraction ~3.1%)
+- UMAP driven by tissue biology, not patient identity
+- Pathologist compartments align with transcriptomic clusters
 
-### SV02 - Spatial Architecture & Niche Identification *(planned)*
+---
 
-Will refine Leiden clusters into biologically annotated spatial niches using Squidpy neighborhood graph methods. Depends on SV01 outputs.
+### SV02 — Spatial Architecture & Niche Identification
 
-## SV01 Key Findings
+**File:** `notebooks/SV02_spatial_architecture_niche_identification.ipynb`
 
-- QC metrics within expected Visium ranges (mean UMI ~11,000; mitochondrial fraction ~3.1%)
-- UMAP clusters driven by tissue biology, not patient identity
-- Pathologist compartment labels align with transcriptomic clusters
-- Spatial markers show expected enrichment (EPCAM in tumor, CD3E at invasive margin, ACTA2/TGFB1 in stroma)
+Maps tumor–immune spatial organization and defines niches from neighborhood composition.
 
-## Git History
+| Section | Description |
+|---------|-------------|
+| Spatial neighborhood graph | Squidpy graph from spot coordinates |
+| Neighborhood enrichment | Permutation test of compartment co-occurrence |
+| Moran's I | Spatial autocorrelation of HVGs |
+| Niche clustering | k-means on neighborhood composition (k=8) |
+| Niche annotation | Biological labels for each niche |
 
-| Commit | Summary |
-|--------|---------|
-| `1423dba` | Initial repository setup |
-| `fbf625f` | Dataset DOI update; improved output saving |
-| `060a316` | Notebook formatting and QC mapping fixes |
-| `c2dc994` | Formatting fixes; empty code cell |
-| `a98551c` | Execution count cleanup; PCA variance figure update |
+**Eight niches:** `tumor_core`, `tumor_margin_interface`, `active_invasive_margin`, `stromal_invasive_margin`, `CAF_rich_stroma`, `immune_rich_stroma`, `immune_aggregate_TLS`, `normal_mucosa`
 
-Large data files are excluded via `.gitignore` to keep the repository pushable to GitHub.
+**Outputs:** `SV02_adata_niches.h5ad`, `reports/figures/SV02/*.png`
+
+**Key findings:**
+- Tumor ↔ immune_aggregate strongly depleted (z ≈ −21) — quantitative immune exclusion
+- Three-layer architecture: tumor core → invasive margin barrier → stromal/immune periphery
+- EPCAM highly spatially organized; PDCD1LG2 not significant (favors CAF/TGF-β over PD-L1 dominance)
+
+---
+
+### SV03 — Spatially Variable Genes & Pathway Enrichment
+
+**File:** `notebooks/SV03_spatially_variable_genes.ipynb`
+
+Identifies molecular programs at exclusion boundaries using DE, GSEA, and PROGENy.
+
+| Section | Description |
+|---------|-------------|
+| Global Moran's I | Dataset-wide spatially variable genes |
+| Niche DE | Marker genes and margin vs tumor-core contrasts |
+| Hallmark GSEA | Pathway enrichment of niche programs (`gseapy`) |
+| PROGENy activity | Pathway scores per niche (`decoupler`) |
+| Exclusion signature | Boundary gene set for downstream validation |
+
+**Outputs:** `SV03_adata_svgs.h5ad`, `SV03_boundary_exclusion_signature.csv` (156 genes), `reports/figures/SV03/*.png`
+
+**Key findings:**
+- IDO1 is the top globally spatially variable gene (chemokine–IDO1 metabolic trap)
+- Boundary niches are an **active immune conflict zone** (IFN response, antigen presentation, IDO1), not only a passive fibrotic wall
+- PROGENy: TGF-β highest in `CAF_rich_stroma`, lowest in `tumor_core` (stroma-derived exclusion)
+- Revised model: stroma TGF-β gradient + boundary IDO1/IFN suppression
+
+---
+
+## Data Policy
+
+Large downloaded and generated files are excluded via `.gitignore` so the repo stays pushable to GitHub (~16 MB). Local data is recreated by running the notebooks in order (SV01 → SV02 → SV03).
+
+Tracked small artifacts include `SV01_qc_metrics.csv` and `SV03_boundary_exclusion_signature.csv`.
