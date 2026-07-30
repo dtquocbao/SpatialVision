@@ -137,7 +137,7 @@ ome-zarr-models==1.7
 omnipath==1.0.12
 overrides==7.7.0
 packaging==26.2
-pandas==3.0.3
+pandas==2.3.3
 pandocfilters==1.5.1
 param==2.4.1
 parso==0.8.7
@@ -249,3 +249,8 @@ gseapy==1.3.0
 decoupler==2.1.6
 cell2location==1.3.1
 torch==2.6.0
+liana==1.8.1
+plotnine==0.15.7
+mizani==0.14.4
+certifi==2026.7.22
+kneed==0.8.6
