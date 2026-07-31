@@ -6,9 +6,9 @@ Computational oncology portfolio project for spatial transcriptomics analysis of
 
 ## Overview
 
-SpatialVision analyzes 10x Visium spatial transcriptomics data to map colorectal cancer tissue architecture and identify spatially coherent immune-exclusion programs. The pipeline uses `SpatialData` as the unified data container, with `scanpy` / `squidpy` for spatial analysis, `cell2location` for deconvolution, `liana` for ligand–receptor inference, and `gseapy` / `decoupler` for pathway enrichment.
+SpatialVision analyzes 10x Visium spatial transcriptomics data to map colorectal cancer tissue architecture and identify spatially coherent immune-exclusion programs. The pipeline uses `SpatialData` as the unified data container, with `scanpy` / `squidpy` for spatial analysis, `cell2location` for deconvolution, `liana` for ligand–receptor inference, `gseapy` / `decoupler` for pathway enrichment, and `xgboost` + `shap` for interpretable phenotype prediction.
 
-**Current status:** SV01–SV05 complete. SV06 (SHAP predictive validation) is next.
+**Current status:** SV01–SV06 complete. SV07 (interactive research platform) is in progress under `app/`.
 
 ## Dataset
 
@@ -29,12 +29,19 @@ SpatialVision/
 │   ├── SV02_spatial_architecture_niche_identification.ipynb
 │   ├── SV03_spatially_variable_genes.ipynb
 │   ├── SV04_cell_type_deconvolution.ipynb
-│   └── SV05_cell_cell_communication.ipynb
+│   ├── SV05_cell_cell_communication.ipynb
+│   ├── SV06_interpretable_ml.ipynb
+│   └── SV07_README.md                 # SV07 local / deploy instructions
+├── app/
+│   ├── SV07_backend_main.py           # FastAPI backend
+│   └── SV07_frontend_App.jsx          # React app root
 ├── data/
 │   ├── raw/                           # Zenodo + GEO downloads (gitignored)
 │   └── processed/                     # Large .h5ad gitignored; small CSVs tracked
-├── models/cell2location/              # Trained Cell2Location model weights
-├── reports/figures/SV01–SV05/
+├── models/
+│   ├── cell2location/                 # Trained Cell2Location weights
+│   └── SV06_xgboost_model.pkl         # Trained XGBoost classifier
+├── reports/figures/SV01–SV06/
 ├── requirements.txt
 └── .gitignore
 ```
@@ -68,6 +75,8 @@ pip install -r requirements.txt
 | torch | 2.6.0 | Cell2Location backend |
 | liana | 1.8.1 | Spatially-informed ligand–receptor analysis |
 | pandas | 2.3.3 | Pinned `<3` for LIANA compatibility |
+| xgboost | 2.1.6 | Immune phenotype classifier |
+| shap | 0.46.1 | TreeSHAP feature attribution |
 
 ```bash
 cd notebooks
@@ -85,7 +94,8 @@ Select the `spatialvision` conda environment as the kernel.
 | **SV03** Spatially Variable Genes | Done | Niche DE, Hallmark GSEA, PROGENy, exclusion signature |
 | **SV04** Cell Type Deconvolution | Done | Cell2Location with Lee et al. 2020 CRC reference |
 | **SV05** Cell–Cell Communication | Done | LIANA+ bivariate LR analysis + NMF programs |
-| **SV06** Predictive Modeling | Planned | SHAP validation of exclusion programs |
+| **SV06** Interpretable ML | Done | XGBoost + SHAP validation of exclusion programs |
+| **SV07** Interactive Platform | In progress | FastAPI + React app under `app/` |
 
 ---
 
@@ -142,19 +152,12 @@ Identifies molecular programs at exclusion boundaries using DE, GSEA, and PROGEN
 
 Estimates per-spot cell-type fractions using a CRC scRNA-seq reference (Lee et al. 2020, GSE132465).
 
-| Stage | Description |
-|-------|-------------|
-| Reference model | Learn cell-type gene signatures from scRNA-seq |
-| Spatial model | Deconvolve Visium spots into abundance estimates |
-| Niche concordance | Validate SV02 niches against cell-type fractions |
-| CAF–TGF-β check | Correlate stromal fraction with TGFB1 expression |
-
 **Outputs:** `SV04_adata_deconvolved.h5ad`, `SV04_cell_type_signatures.csv`, `models/cell2location/*`, `reports/figures/SV04/*.png`
 
 **Key findings:**
 - Niche–cell-type concordance: CAF_rich_stroma → stroma; immune_aggregate_TLS → T cells; normal_mucosa → epithelium
 - Stromal fraction correlates with TGFB1 (r ≈ 0.33) — third independent confirmation of stroma-derived TGF-β
-- CAF–T cell co-localization peaks in CAF_rich / immune_rich stroma (signal originates in stroma, not only at the margin)
+- CAF–T cell co-localization peaks in CAF_rich / immune_rich stroma
 
 ---
 
@@ -164,14 +167,6 @@ Estimates per-spot cell-type fractions using a CRC scRNA-seq reference (Lee et a
 
 Spatially-informed bivariate ligand–receptor analysis with NMF communication programs.
 
-| Section | Description |
-|---------|-------------|
-| Spatial connectivity | Radial kernel graph for LIANA+ |
-| Bivariate LR scoring | Spatially-weighted ligand–receptor interactions |
-| Niche localization | Interaction activity per spatial niche |
-| NMF factorization | Coordinated communication programs |
-| SHAP targets | Compile genes for SV06 validation |
-
 **Outputs:** `SV05_shap_validation_targets.csv` (68 genes), `reports/figures/SV05/*.png`
 
 **Key findings — four-layer exclusion model:**
@@ -180,17 +175,56 @@ Spatially-informed bivariate ligand–receptor analysis with NMF communication p
 3. **active_invasive_margin:** CXCL9/10/11 chemokine recruitment of T cells to the boundary
 4. **immune_rich_stroma:** CXCL12→CXCR4 T cell trapping in stroma
 
-Note: IDO1 is not a canonical surface LR pair, so it is absent from LIANA resources by design (not a method failure).
+---
+
+### SV06 — Interpretable Machine Learning (XGBoost + SHAP)
+
+**File:** `notebooks/SV06_interpretable_ml.ipynb`
+
+Predicts immune phenotype (excluded vs infiltrated) from unbiased HVG features, then uses TreeSHAP to test whether LIANA priority genes are recovered independently.
+
+| Stage | Description |
+|-------|-------------|
+| Feature matrix | HVG expression (no pre-selected exclusion genes) |
+| Classifier | XGBoost with donor-held-out validation |
+| Attribution | TreeSHAP exact Shapley values |
+| Validation | Rank of SV05 priority genes among top SHAP features |
+
+**Outputs:** `SV06_shap_values_top50.csv`, `SV06_xgboost_model.pkl`, `SV06_adata_ml.h5ad`, `reports/figures/SV06/*.png`
+
+**Key findings:**
+- Strong predictive performance: **AUC = 0.925** on held-out patients
+- SHAP recovered **3/10** LIANA priority genes in the top 50: **COL1A1, COL3A1, FN1** (ECM barrier)
+- Chemokine / TGFB1 priorities ranked lower — ECM physical barrier is the dominant SHAP-validated exclusion program
+- Cross-framework agreement: LIANA (SV05) + SHAP (SV06) both highlight ECM components as central to exclusion in MSS CRC
+- Top global SHAP features also include TLS / B-cell markers (e.g. CXCL13, IGH*), consistent with immune phenotype biology
+
+---
+
+### SV07 — Interactive Research Platform
+
+**Code:** `app/SV07_backend_main.py`, `app/SV07_frontend_App.jsx`  
+**Setup guide:** [`notebooks/SV07_README.md`](notebooks/SV07_README.md)
+
+FastAPI serves pre-computed SV01–SV06 results as JSON; React visualizes patients, spatial niches, LIANA programs, and SHAP features.
+
+```bash
+cd app
+uvicorn SV07_backend_main:app --reload --port 8000
+# Frontend: scaffold under app/frontend/ then npm run dev → http://localhost:5173
+```
 
 ---
 
 ## Data Policy
 
-Large downloaded and generated files are excluded via `.gitignore` so the repo stays pushable to GitHub. Local data is recreated by running notebooks in order (SV01 → SV05).
+Large downloaded and generated files are excluded via `.gitignore` so the repo stays pushable to GitHub. Local data is recreated by running notebooks in order (SV01 → SV06).
 
-**Tracked small artifacts:**
+**Tracked / pending small artifacts:**
 - `SV01_qc_metrics.csv`
 - `SV03_boundary_exclusion_signature.csv`
 - `SV04_cell_type_signatures.csv`
-- `SV05_shap_validation_targets.csv` *(pending commit)*
-- Cell2Location model weights under `models/cell2location/`
+- `SV05_shap_validation_targets.csv`
+- `SV06_shap_values_top50.csv` *(pending commit)*
+- Cell2Location weights under `models/cell2location/`
+- `models/SV06_xgboost_model.pkl` *(pending commit)*
