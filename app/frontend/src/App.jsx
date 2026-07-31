@@ -658,7 +658,7 @@ export default function App() {
         {/* ── About ─────────────────────────────────────────────────────── */}
         {activeTab === "about" && summary && (
           <div style={{ maxWidth: 900 }}>
-            <Card title="SpatialVision — Project Overview">
+            <Card title="SpatialVision - Project Overview">
               <div style={{ fontSize: 14, lineHeight: 1.8, color: "#CCC", marginBottom: 20 }}>
                 {summary.subtitle}. Dataset: {summary.dataset}.
               </div>
@@ -706,7 +706,7 @@ export default function App() {
                 <strong style={{ color: "#CCC" }}>Reference:</strong> {summary.reference}<br />
                 <strong style={{ color: "#CCC" }}>Methods:</strong> scanpy, squidpy, Cell2Location,
                 LIANA+, decoupleR, XGBoost, SHAP<br />
-                <strong style={{ color: "#CCC" }}>Author:</strong> Bao Dang —
+                <strong style={{ color: "#CCC" }}>Author:</strong> Bao Dang -
                 Computational Biology Portfolio, Texas A&M / BCM GSBS 2027
               </div>
             </Card>

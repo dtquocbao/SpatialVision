@@ -298,7 +298,7 @@ def get_summary():
                 "icon": "🧬",
                 "title": "IDO1 as Top Spatially Variable Gene",
                 "text": "IDO1 ranked #1 globally by Moran's I (I=0.929) without "
-                        "prior selection — tryptophan metabolic suppression "
+                        "prior selection, tryptophan metabolic suppression "
                         "co-localizes with CXCL10/CXCL11 chemokine recruitment, "
                         "forming a molecular trap at the exclusion boundary."
             },
@@ -307,7 +307,7 @@ def get_summary():
                 "title": "XGBoost + SHAP Validation",
                 "text": "XGBoost classifier (AUC=0.925) independently recovered "
                         "ECM genes (COL1A2, COL3A1, COL1A1, FN1) as top predictors "
-                        "of immune exclusion — converging with LIANA findings through "
+                        "of immune exclusion, converging with LIANA findings through "
                         "a completely independent analytical framework."
             },
         ],
