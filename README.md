@@ -3,16 +3,17 @@ title: SpatialVision
 emoji: 🔬
 colorFrom: blue
 colorTo: green
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: "5.38.0"
+python_version: "3.12"
+app_file: app.py
 pinned: false
-short_description: CRC spatial transcriptomics — FastAPI + React app
+short_description: CRC spatial transcriptomics — Gradio demo
 tags:
   - spatial-transcriptomics
   - single-cell
   - oncology
-  - fastapi
-  - docker
+  - gradio
 ---
 
 # SpatialVision
@@ -73,7 +74,8 @@ Requires **Python 3.12**.
 ```bash
 conda create -n spatialvision python=3.12
 conda activate spatialvision
-pip install -r requirements.txt
+pip install -r requirements-lock.txt   # full research stack
+# pip install -r requirements.txt      # Gradio Space / slim SV07 only
 ```
 
 ### Key dependencies

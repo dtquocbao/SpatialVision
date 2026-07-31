@@ -1,24 +1,25 @@
 # SpatialVision — Interactive Platform (SV07)
 
 Spatial transcriptomics platform for CRC immune exclusion analysis.
-FastAPI backend + React frontend, living under `app/` at the project root.
+
+- **Local / portfolio UI:** FastAPI + React under `app/`
+- **Hugging Face Space:** Gradio (`app.py`) — required for **ZeroGPU**
 
 ```
 SpatialVision/
-├── Dockerfile                      # Hugging Face Docker Space image
-├── .github/workflows/
-│   └── sync-to-hub.yml             # CI/CD: push main → HF Space
+├── app.py                          # Gradio Space entry (HF app_file)
+├── requirements.txt                # Slim deps for HF Gradio Space
+├── requirements-lock.txt           # Full research stack pin
+├── .github/workflows/sync-to-hub.yml
 ├── app/
-│   ├── SV07_backend_main.py        # FastAPI backend
-│   ├── requirements-sv07.txt       # Slim deps for Space / Docker
-│   └── frontend/                   # Vite + React (has package.json)
-│       └── src/App.jsx
-├── data/processed/                 # Pre-computed SV01–SV06 outputs
-└── notebooks/SV07_README.md        # This file
+│   ├── SV07_backend_main.py        # Shared data loader + FastAPI
+│   └── frontend/                   # Vite + React (local UI)
+├── data/processed/
+└── notebooks/SV07_README.md
 ```
 
-GitHub repo: [dtquocbao/SpatialVision](https://github.com/dtquocbao/SpatialVision)  
-Target Space: [dtquocbao/SpatialVision](https://huggingface.co/spaces/dtquocbao/SpatialVision) (create once if missing)
+GitHub: [dtquocbao/SpatialVision](https://github.com/dtquocbao/SpatialVision)  
+Space: [dtquocbao/SpatialVision](https://huggingface.co/spaces/dtquocbao/SpatialVision)
 
 ---
 
@@ -104,19 +105,32 @@ Recreate `.h5ad` files by running notebooks SV01 → SV06. Small CSVs can stay i
 
 ---
 
-## Hugging Face Space + GitHub CI/CD
+## Hugging Face Space + GitHub CI/CD (Gradio / ZeroGPU)
 
-On every push to `main` (and on manual run), GitHub Actions mirrors this repo to a **Docker** Space using [`huggingface/hub-sync`](https://github.com/huggingface/hub-sync). The Space builds the root `Dockerfile` (frontend build + uvicorn on port **7860**).
+On every push to `main`, GitHub Actions mirrors this repo to a **Gradio** Space via [`huggingface/hub-sync`](https://github.com/huggingface/hub-sync).
 
-Docs: [Managing Spaces with GitHub Actions](https://huggingface.co/docs/hub/spaces-github-actions)
+**ZeroGPU is Gradio-only** — `sdk: docker` will fail with *ZeroGPU is only available on Gradio SDK*. This repo uses:
+
+| Field | Value |
+|-------|--------|
+| `sdk` | `gradio` |
+| `app_file` | `app.py` |
+| `sdk_version` | `5.38.0` |
+
+Docs: [Spaces config](https://huggingface.co/docs/hub/spaces-config-reference) · [GitHub Actions](https://huggingface.co/docs/hub/spaces-github-actions)
+
+### Local Gradio smoke test
+
+```bash
+conda activate spatialvision
+pip install -r requirements.txt
+set DATA_DIR=%CD%\data\processed
+python app.py
+```
 
 ### One-time setup
 
 #### 0. Space `README.md` YAML (required)
-
-Hugging Face reads **YAML frontmatter** at the top of the repo-root `README.md`. Without it the Space shows *Missing configuration in README*.
-
-This repo already includes:
 
 ```yaml
 ---
@@ -124,144 +138,71 @@ title: SpatialVision
 emoji: 🔬
 colorFrom: blue
 colorTo: green
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: "5.38.0"
+python_version: "3.12"
+app_file: app.py
 pinned: false
+short_description: CRC spatial transcriptomics — Gradio demo
 ---
 ```
 
-After changing it, push to `main` so CI re-syncs the Space (or edit README on the Space and keep GitHub in sync).
+In Space **Settings → Hardware**, choose **ZeroGPU** or CPU. ZeroGPU requires `sdk: gradio`.
 
-#### 1. Create the Space (if it does not exist)
+#### 1. Create the Space (if needed)
 
-1. Open [huggingface.co/new-space](https://huggingface.co/new-space)
-2. **Owner:** `dtquocbao` · **Name:** `SpatialVision` (must match the workflow `huggingface_repo_id`)
-3. **SDK:** Docker
-4. Visibility: public or private as you prefer
+1. [huggingface.co/new-space](https://huggingface.co/new-space)
+2. Owner `dtquocbao` · Name `SpatialVision`
+3. **SDK: Gradio** (not Docker)
 
-`hub-sync` can also create the Space on first run when `space_sdk: docker` is set.
+Workflow uses `space_sdk: gradio` in `.github/workflows/sync-to-hub.yml`.
 
-#### 2. Create a Hugging Face write token
+#### 2–3. HF token → GitHub secret `HF_TOKEN`
 
-1. [HF Settings → Access Tokens](https://huggingface.co/settings/tokens)
-2. Create a token with **write** access to the Space (fine-grained, scoped to that Space, is best)
-3. Copy the token once
+Create a write token at [HF tokens](https://huggingface.co/settings/tokens), then add repo secret `HF_TOKEN`.
 
-#### 3. Add the token to GitHub
+#### 4. Provide processed data
 
-1. Repo → **Settings** → **Secrets and variables** → **Actions**
-2. **New repository secret**
-   - Name: `HF_TOKEN`
-   - Value: your HF write token
+`hub-sync` deletes Space files not in GitHub — do not one-off upload `.h5ad` into the Space git tree.
 
-#### 4. Confirm the workflow file
+Prefer a Dataset (`dtquocbao/SpatialVision-data`) + download into `DATA_DIR` at startup, or keep only small CSVs in git.
 
-Already in the repo:
-
-```text
-.github/workflows/sync-to-hub.yml
-```
-
-It syncs `dtquocbao/SpatialVision` (GitHub) → `dtquocbao/SpatialVision` (Space).  
-If your Space name differs, edit `huggingface_repo_id` in that file.
-
-#### 5. Provide processed data (important with `hub-sync`)
-
-`hub-sync` **mirrors** the GitHub tree and **deletes** Space files that are not in GitHub. Do **not** rely on one-off uploads of `.h5ad` into the Space git repo, the next CI run will remove them.
-
-Use one of these patterns instead:
-
-**Option A — Hugging Face Dataset (recommended)**
-
-1. Create a Dataset repo (e.g. `dtquocbao/SpatialVision-data`) and upload required processed files there (Git LFS for large `.h5ad`).
-2. In the Space, set secrets/variables as needed for private datasets.
-3. Add a small startup download in the container (or extend the Dockerfile `CMD` wrapper) that pulls into `DATA_DIR=/data/processed`.
-
-**Option B — bake small CSVs in git; fetch `.h5ad` at runtime**
-
-Tracked CSVs sync with CI. For `.h5ad`, download from Zenodo / your Dataset in an entrypoint script before uvicorn starts.
-
-**Option C — persistent disk outside the git mirror**
-
-If your Space hardware includes persistent storage mounted at `/data`, keep processed files there and set:
-
-| Name | Value |
-|------|--------|
-| `DATA_DIR` | `/data/processed` |
-
-Ensure that path is **not** overwritten by the synced repository layout.
+#### 5. Trigger CI/CD
 
 ```bash
-# Example Dataset upload (run locally once)
-pip install -U huggingface_hub
-hf auth login
-hf upload dtquocbao/SpatialVision-data data/processed/SV02_adata_niches.h5ad \
-  SV02_adata_niches.h5ad --repo-type dataset
-```
-
-The Dockerfile defaults `DATA_DIR=/data/processed`.
-
-#### 6. Trigger CI/CD
-
-```bash
-git add Dockerfile app/ .github/workflows/sync-to-hub.yml
-git commit -m "Add Hugging Face Space Docker deploy and CI sync"
+git add app.py README.md requirements.txt requirements-lock.txt .github/workflows/sync-to-hub.yml
+git commit -m "Switch Hugging Face Space to Gradio for ZeroGPU"
 git push origin main
 ```
 
-Or run **Actions** → **Sync to Hugging Face Space** → **Run workflow**.
-
-Watch:
-
-- GitHub: **Actions** tab (sync job)
-- Hugging Face: Space → **Logs** (Docker build + uvicorn)
-
-Space URL: https://huggingface.co/spaces/dtquocbao/SpatialVision
+Or **Actions** → **Sync to Hugging Face Space** → **Run workflow**.
 
 ### What the pipeline does
 
 ```text
 push to main
-    → GitHub Action checkout
-    → hub-sync uploads repo files to the Space (excludes .git / .github)
-    → HF builds Dockerfile
-         · pip install app/requirements-sv07.txt
-         · npm ci && VITE_API_URL= npm run build
-         · uvicorn SV07_backend_main:app --port 7860
-    → Space serves API + React UI on one origin
-```
-
-### Local Docker smoke test (optional)
-
-```bash
-docker build -t spatialvision .
-docker run --rm -p 7860:7860 \
-  -e DATA_DIR=/data/processed \
-  -v "%CD%/data/processed:/data/processed" \
-  spatialvision
-# open http://localhost:7860
+    → hub-sync mirrors repo to the Space
+    → HF installs requirements.txt (slim)
+    → runs Gradio app.py
+    → ZeroGPU-compatible demo (spatial / SHAP / LIANA tabs)
 ```
 
 ### Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| Action fails auth | Recreate `HF_TOKEN` with write scope; ensure secret name is exactly `HF_TOKEN` |
-| Space builds but UI calls `localhost:8000` | Rebuild frontend with empty `VITE_API_URL` (Dockerfile already does this) |
-| API empty / missing niches | Upload `.h5ad` files; confirm `DATA_DIR` points at them |
-| `uvicorn` import error | Run module as `SV07_backend_main:app` with cwd `/app/app` (Dockerfile sets this) |
-| Wrong Space updated | Align `huggingface_repo_id` in `.github/workflows/sync-to-hub.yml` |
+| ZeroGPU only on Gradio | Set `sdk: gradio` + `app_file: app.py` (done in README) |
+| `short_description` invalid | Keep ≤ 60 characters |
+| Action auth failure | Refresh `HF_TOKEN` write scope |
+| Empty plots | Supply `data/processed` `.h5ad` / CSVs via Dataset or `DATA_DIR` |
+| Wrong Space | Match `huggingface_repo_id` in the workflow |
 
-### Alternative: manual git push to the Space
-
-If you prefer git-to-git instead of `hub-sync` file mirroring:
+### Alternative: manual git push
 
 ```bash
 git remote add space https://huggingface.co/spaces/dtquocbao/SpatialVision
 git push space main
 ```
-
-Use a token as the password, or embed it in the HTTPS URL only in CI (never commit tokens).
 
 ---
 

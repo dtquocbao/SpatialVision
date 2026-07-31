@@ -19,4 +19,4 @@ jobs:
           huggingface_repo_id: dtquocbao/SpatialVision
           hf_token: ${{ secrets.HF_TOKEN }}
           repo_type: space
-          space_sdk: docker
+          space_sdk: gradio
