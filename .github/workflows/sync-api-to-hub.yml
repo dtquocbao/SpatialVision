@@ -1,18 +1,11 @@
 name: Sync API Space (Docker)
 
-# Creates/updates dtquocbao/SpatialVision-api for the Vercel frontend.
-# Gradio demo Space stays on sync-to-hub.yml → dtquocbao/SpatialVision.
+# OPTIONAL — Docker Spaces are paid on some HF plans.
+# Prefer Gradio-only: app.py mounts FastAPI on dtquocbao/SpatialVision (sync-to-hub.yml).
+# Keep this workflow only if you have Docker Spaces enabled.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "app/SV07_backend_main.py"
-      - "app/ensure_data.py"
-      - "app/requirements-sv07.txt"
-      - "spaces/api/**"
-      - ".github/workflows/sync-api-to-hub.yml"
-  workflow_dispatch:
+  workflow_dispatch:  # manual only — not on every push
 
 jobs:
   sync-api:

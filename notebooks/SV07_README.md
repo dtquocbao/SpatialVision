@@ -75,95 +75,68 @@ VITE_API_URL=http://localhost:8000
 
 ---
 
-## Vercel frontend ↔ Hugging Face FastAPI backend
+## Vercel frontend ↔ Gradio Space (API on free tier)
 
-The React app on **Vercel** talks to FastAPI on a **Docker** Hugging Face Space (not the Gradio ZeroGPU demo). Gradio does not expose your `/api/*` JSON routes for the portfolio UI.
+Docker Spaces are paid on some accounts. Use **one Gradio Space** that mounts FastAPI:
 
 ```text
-Browser → https://your-app.vercel.app     (Vite/React)
-                │  fetch(`${VITE_API_URL}/api/...`)
+Browser → https://your-app.vercel.app
+                │  VITE_API_URL
                 ▼
-         https://<space>.hf.space         (FastAPI / Docker Space)
+         https://dtquocbao-spatialvision.hf.space
+                ├── /           Gradio UI
+                ├── /api/*      FastAPI JSON (React)
+                └── /docs       OpenAPI
                 │
                 ▼
          Dataset dtquocbao/SpatialVision-data
 ```
 
-### 1. Create an API Space (Docker)
+`app.py` does `gr.mount_gradio_app(api_app, demo, path="/")` so `/api/shap` etc. work without Docker.
 
-> **If `https://dtquocbao-spatialvision-api.hf.space/...` returns Hub 404**, the Space
-> `dtquocbao/SpatialVision-api` does not exist yet (or never built). The Gradio demo
-> Space (`SpatialVision`) is separate and does **not** serve `/api/shap`.
+### 1. Hugging Face Space (Gradio + ZeroGPU)
 
-**Option A — GitHub Action (recommended)**
+On [Create a new Space](https://huggingface.co/new-space) (or keep existing `SpatialVision`):
 
-1. Ensure repo secret `HF_TOKEN` has write access
-2. Run **Actions → Sync API Space (Docker) → Run workflow**
-3. Wait until [huggingface.co/spaces/dtquocbao/SpatialVision-api](https://huggingface.co/spaces/dtquocbao/SpatialVision-api) shows a running Docker build
-4. Set Space secrets: `HF_TOKEN` (if Dataset private), optional `HF_DATA_REPO=dtquocbao/SpatialVision-data`
+| Field | Value |
+|-------|--------|
+| Space name | `SpatialVision` |
+| SDK | **Gradio** (not Docker) |
+| Template | Blank |
+| Hardware | **ZeroGPU** (or CPU Basic) |
 
-**Option B — create manually**
+Do **not** create `SpatialVision-api`. Sync this repo with the existing Gradio workflow (`sync-to-hub.yml`).
 
-1. [New Space](https://huggingface.co/new-space) → name `SpatialVision-api` → **SDK: Docker**
-2. Push contents of `spaces/api/` (plus copied `SV07_backend_main.py`, `ensure_data.py`, `requirements-sv07.txt` from `app/`) as the Space root
-3. Or run the workflow above after creating an empty Docker Space
-
-Direct API host (use in Vercel — **not** `huggingface.co/spaces/...`):
-
-```text
-https://dtquocbao-spatialvision-api.hf.space
-```
-
-Smoke-test **after** the Space is Running:
-
-```bash
-curl https://dtquocbao-spatialvision-api.hf.space/api/health
-curl https://dtquocbao-spatialvision-api.hf.space/api/shap
-curl https://dtquocbao-spatialvision-api.hf.space/docs
-```
+Space secrets / variables:
 
 | Name | Value |
 |------|--------|
 | `HF_DATA_REPO` | `dtquocbao/SpatialVision-data` |
-| `DATA_DIR` | `/data/processed` |
-| `HF_TOKEN` | read token if Dataset is private |
-| `CORS_ORIGINS` | `*` (default) or `https://your-app.vercel.app` |
+| `HF_TOKEN` | only if the Dataset is private |
 
-Local image test:
+After the Space is **Running**, smoke-test:
 
 ```bash
-# from repo root after copying app files into spaces/api (same as CI)
-cp app/SV07_backend_main.py app/ensure_data.py app/requirements-sv07.txt spaces/api/
-docker build -t spatialvision-api spaces/api
-docker run --rm -p 7860:7860 -e HF_TOKEN=%HF_TOKEN% spatialvision-api
+curl https://dtquocbao-spatialvision.hf.space/api/health
+curl https://dtquocbao-spatialvision.hf.space/api/shap
+# Gradio UI:
+# https://dtquocbao-spatialvision.hf.space/
 ```
 
 ### 2. Deploy frontend on Vercel
 
-From `app/frontend` (or set Vercel **Root Directory** to `app/frontend`):
-
-1. Import the GitHub repo in Vercel
-2. **Root Directory:** `app/frontend`
-3. Framework: Vite
-4. **Environment variable** (Production + Preview):
+1. Root Directory: `app/frontend`
+2. Environment variable (Production + Preview):
 
 | Name | Value |
 |------|--------|
-| `VITE_API_URL` | `https://dtquocbao-spatialvision-api.hf.space` |
+| `VITE_API_URL` | `https://dtquocbao-spatialvision.hf.space` |
 
-No trailing slash. Rebuild after changing env vars (`VITE_*` is baked in at build time).
-
-5. `vercel.json` is included for SPA client-side routing
-
-```bash
-cd app/frontend
-# optional CLI deploy
-npx vercel --prod
-```
+No trailing slash. Redeploy after changing `VITE_*` (baked in at build time).
 
 ### 3. CORS
 
-Backend already allows all origins and `https://*.vercel.app` via regex. To lock down:
+Backend allows `*` and `https://*.vercel.app`. Optional lock-down:
 
 ```bash
 CORS_ORIGINS=https://your-app.vercel.app
@@ -173,9 +146,9 @@ CORS_ORIGINS=https://your-app.vercel.app
 
 | Mistake | Why it fails |
 |---------|----------------|
-| Point `VITE_API_URL` at the Gradio Space | Gradio UI ≠ `/api/patients` JSON |
-| Use `https://huggingface.co/spaces/...` as API base | That’s the Hub page, not the app host |
-| Forget to rebuild Vercel after changing `VITE_API_URL` | Vite inlines env at build time |
+| Point Vercel at `…-spatialvision-api.hf.space` | That Docker Space is optional/paid and may not exist |
+| Use `https://huggingface.co/spaces/...` as API base | Hub page, not the app host |
+| Expect `/api/*` before `app.py` with `mount_gradio_app` is synced | Push + wait for Space rebuild |
 
 ### 3. Build for production (local static)
 

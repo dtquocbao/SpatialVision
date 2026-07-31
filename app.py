@@ -1,8 +1,11 @@
 """
-SpatialVision — Hugging Face Gradio Space entrypoint.
+SpatialVision — Hugging Face Gradio Space entrypoint (free tier / ZeroGPU).
 
-Pulls processed outputs from dataset dtquocbao/SpatialVision-data.
-ZeroGPU requires at least one @spaces.GPU-decorated function.
+Serves:
+  • Gradio UI at /
+  • FastAPI JSON at /api/*  (for Vercel frontend)
+
+Docker is not required — mount FastAPI onto Gradio.
 """
 
 from __future__ import annotations
@@ -35,6 +38,9 @@ except ImportError:  # local runs without the Spaces runtime
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "app"))
 
+# Avoid FastAPI SPA catch-all stealing Gradio routes if a local dist/ exists
+os.environ.setdefault("FRONTEND_DIR", "/tmp/spatialvision-no-frontend")
+
 from ensure_data import ensure_data_from_hub  # noqa: E402
 
 DATA_DIR = ensure_data_from_hub(
@@ -44,7 +50,7 @@ DATA_DIR = ensure_data_from_hub(
 os.environ["DATA_DIR"] = str(DATA_DIR)
 DATA_REPO = os.environ.get("HF_DATA_REPO", "dtquocbao/SpatialVision-data")
 
-from SV07_backend_main import load_data, store  # noqa: E402
+from SV07_backend_main import app as api_app, load_data, store  # noqa: E402
 
 load_data()
 
@@ -179,6 +185,8 @@ def summary_md() -> str:
 | XGBoost AUC | {metrics.get("AUC", "0.925")} |
 | Data repo | `{DATA_REPO}` |
 
+**API for Vercel:** `/api/health`, `/api/shap`, `/api/spatial/{{id}}`, … · OpenAPI at `/docs`
+
 **Four-layer exclusion model (LIANA+):** CAF TGF-β → stromal ECM barrier (COL1A1/FN1)
 → invasive-margin chemokines (CXCL9/10/11) → CXCL12→CXCR4 stromal trapping.
 """
@@ -220,5 +228,9 @@ with gr.Blocks(title="SpatialVision", theme=gr.themes.Soft()) as demo:
     )
 
 
+# HF Gradio Spaces: export FastAPI `app` with Gradio mounted so /api/* works for Vercel
+app = gr.mount_gradio_app(api_app, demo, path="/")
+
 if __name__ == "__main__":
-    demo.launch()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
