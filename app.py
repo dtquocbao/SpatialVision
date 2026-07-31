@@ -50,6 +50,7 @@ DATA_DIR = ensure_data_from_hub(
 os.environ["DATA_DIR"] = str(DATA_DIR)
 DATA_REPO = os.environ.get("HF_DATA_REPO", "dtquocbao/SpatialVision-data")
 
+# Import after DATA_DIR is populated so load_data finds .h5ad files
 from SV07_backend_main import app as api_app, load_data, store  # noqa: E402
 
 load_data()

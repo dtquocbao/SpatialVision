@@ -33,14 +33,14 @@ app.add_middleware(
 )
 
 # ── Data paths ─────────────────────────────────────────────────────────────
-DATA_DIR = Path(os.getenv("DATA_DIR", "../data/processed"))
+DATA_DIR = Path(os.getenv("DATA_DIR", "../data/processed")).resolve()
 
-# Pull missing files from HF Dataset when running on Spaces / empty DATA_DIR
+# Pull missing files from HF Dataset when running on Spaces / empty DATA_DIR.
+# Skip if app.py already ran ensure_data_from_hub (sets DATA_DIR + files).
 try:
     from ensure_data import ensure_data_from_hub
 
     DATA_DIR = ensure_data_from_hub(DATA_DIR)
-    os.environ["DATA_DIR"] = str(DATA_DIR)
 except Exception as _exc:  # noqa: BLE001
     print(f"  ⚠ ensure_data_from_hub skipped: {_exc}")
 
@@ -49,7 +49,10 @@ store = {}
 
 def load_data():
     """Load all processed data into memory at startup."""
+    global DATA_DIR
+    DATA_DIR = Path(os.getenv("DATA_DIR", str(DATA_DIR))).resolve()
     print("Loading SpatialVision data...")
+    print(f"  using DATA_DIR={DATA_DIR}")
 
     # ── Patient metadata ───────────────────────────────────────────────────
     store["patients"] = {
@@ -229,7 +232,9 @@ def load_data():
 # ── Load on startup ────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
-    load_data()
+    # app.py may have already loaded; avoid a second full h5ad read
+    if not store.get("samples") and not store.get("shap_top50"):
+        load_data()
 
 # ── API endpoints ──────────────────────────────────────────────────────────
 
