@@ -175,7 +175,6 @@ Place these in `data/processed/` (project root). Large `.h5ad` files are **gitig
 | `SV05_adata_liana.h5ad` | SV05 | Cell type fractions, LIANA NMF factors |
 | `SV05_shap_validation_targets.csv` | SV05 | LIANA priority genes |
 | `SV06_shap_values_top50.csv` | SV06 | SHAP values for top 50 genes |
-| `SV06_model_metrics.csv` | SV06 | AUC, F1 metrics |
 | `SV06_adata_ml.h5ad` | SV06 | Immune phenotype predictions |
 
 Recreate `.h5ad` files by running notebooks SV01 → SV06. Small CSVs can stay in git.

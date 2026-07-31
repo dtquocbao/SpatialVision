@@ -10,17 +10,13 @@ from huggingface_hub import hf_hub_download
 
 DEFAULT_REPO = "dtquocbao/SpatialVision-data"
 
-# Paths inside the Dataset repo. SV06_model_metrics.csv is optional (often absent).
+# Paths inside the Dataset repo (flat files land in DATA_DIR).
 REQUIRED_DATASETS = [
     "processed/SV02_adata_niches.h5ad",
     "processed/SV06_shap_values_top50.csv",
     "processed/SV05_shap_validation_targets.csv",
     "processed/SV03_boundary_exclusion_signature.csv",
     "processed/SV06_adata_ml.h5ad",
-]
-
-OPTIONAL_DATASETS = [
-    "processed/SV06_model_metrics.csv",
 ]
 
 _DONE = False
@@ -61,10 +57,9 @@ def ensure_data_from_hub(
         print("  ✓ dataset ensure already completed this process")
         return data_dir
 
-    for rel in REQUIRED_DATASETS + OPTIONAL_DATASETS:
+    for rel in REQUIRED_DATASETS:
         name = Path(rel).name
         dest = data_dir / name
-        optional = rel in OPTIONAL_DATASETS
 
         if dest.exists() and dest.stat().st_size > 0:
             print(f"  ✓ {name} (local, {dest.stat().st_size:,} bytes)")
@@ -96,8 +91,7 @@ def ensure_data_from_hub(
                 )
             print(f"  ✓ {name} ({dest.stat().st_size:,} bytes) → {dest}")
         except Exception as exc:  # noqa: BLE001
-            level = "⚠ skip" if optional else "⚠ missing"
-            print(f"  {level} {name}: {exc}")
+            print(f"  ⚠ missing {name}: {exc}")
 
     _DONE = True
     return data_dir
