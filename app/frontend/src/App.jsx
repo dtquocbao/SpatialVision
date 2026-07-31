@@ -634,7 +634,7 @@ export default function App() {
                     borderLeft: `3px solid ${color}`,
                   }}>
                     <div style={{ fontSize: 11, color, fontWeight: 700, marginBottom: 2 }}>
-                      {layer} — {NICHE_LABELS[niche] || niche}
+                      {layer} - {NICHE_LABELS[niche] || niche}
                     </div>
                     <div style={{ fontSize: 12, color: "#CCC", marginBottom: 3, fontFamily: "monospace" }}>
                       {signals}
