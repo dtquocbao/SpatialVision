@@ -1,3 +1,20 @@
+---
+title: SpatialVision
+emoji: 🔬
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Spatial transcriptomics of CRC immune exclusion (FastAPI + React)
+tags:
+  - spatial-transcriptomics
+  - single-cell
+  - oncology
+  - fastapi
+  - docker
+---
+
 # SpatialVision
 
 Computational oncology portfolio project for spatial transcriptomics analysis of colorectal cancer using the scverse ecosystem.

@@ -112,6 +112,26 @@ Docs: [Managing Spaces with GitHub Actions](https://huggingface.co/docs/hub/spac
 
 ### One-time setup
 
+#### 0. Space `README.md` YAML (required)
+
+Hugging Face reads **YAML frontmatter** at the top of the repo-root `README.md`. Without it the Space shows *Missing configuration in README*.
+
+This repo already includes:
+
+```yaml
+---
+title: SpatialVision
+emoji: 🔬
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+```
+
+After changing it, push to `main` so CI re-syncs the Space (or edit README on the Space and keep GitHub in sync).
+
 #### 1. Create the Space (if it does not exist)
 
 1. Open [huggingface.co/new-space](https://huggingface.co/new-space)
