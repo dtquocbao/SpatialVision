@@ -254,3 +254,5 @@ plotnine==0.15.7
 mizani==0.14.4
 certifi==2026.7.22
 kneed==0.8.6
+xgboost==2.1.6
+shap==0.46.1
