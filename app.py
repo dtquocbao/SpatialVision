@@ -15,7 +15,6 @@ import gradio as gr
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from huggingface_hub import hf_hub_download
 
 try:
     import spaces
@@ -34,58 +33,16 @@ except ImportError:  # local runs without the Spaces runtime
     spaces = _SpacesFallback()
 
 ROOT = Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("DATA_DIR", ROOT / "data" / "processed"))
-DATA_REPO = os.environ.get("HF_DATA_REPO", "dtquocbao/SpatialVision-data")
-
-# Files under dataset `processed/` needed by the Gradio demo
-REQUIRED_DATASETS = [
-    "processed/SV02_adata_niches.h5ad",
-    "processed/SV06_shap_values_top50.csv",
-    "processed/SV05_shap_validation_targets.csv",
-    "processed/SV03_boundary_exclusion_signature.csv",
-    "processed/SV06_model_metrics.csv",
-    "processed/SV06_adata_ml.h5ad",  # optional-ish; phenotype probabilities
-]
-
-os.environ["DATA_DIR"] = str(DATA_DIR)
 sys.path.insert(0, str(ROOT / "app"))
 
+from ensure_data import ensure_data_from_hub  # noqa: E402
 
-def ensure_data_from_hub() -> None:
-    """Download missing processed files from the HF Dataset into DATA_DIR."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
-
-    for rel in REQUIRED_DATASETS:
-        name = Path(rel).name
-        dest = DATA_DIR / name
-        if dest.exists():
-            print(f"  ✓ {name} (local)")
-            continue
-        print(f"  ↓ downloading {rel} from {DATA_REPO} ...")
-        try:
-            cached = hf_hub_download(
-                repo_id=DATA_REPO,
-                filename=rel,
-                repo_type="dataset",
-                token=token,
-            )
-            # Place a stable path under DATA_DIR for the backend loader
-            if Path(cached).resolve() != dest.resolve():
-                dest.unlink(missing_ok=True)
-                try:
-                    dest.hardlink_to(cached)
-                except OSError:
-                    import shutil
-                    shutil.copy2(cached, dest)
-            print(f"  ✓ {name}")
-        except Exception as exc:  # noqa: BLE001 — continue with partial data
-            print(f"  ⚠ skip {name}: {exc}")
-
-
-print(f"DATA_DIR={DATA_DIR}")
-print(f"HF_DATA_REPO={DATA_REPO}")
-ensure_data_from_hub()
+DATA_DIR = ensure_data_from_hub(
+    os.environ.get("DATA_DIR", ROOT / "data" / "processed"),
+    os.environ.get("HF_DATA_REPO", "dtquocbao/SpatialVision-data"),
+)
+os.environ["DATA_DIR"] = str(DATA_DIR)
+DATA_REPO = os.environ.get("HF_DATA_REPO", "dtquocbao/SpatialVision-data")
 
 from SV07_backend_main import load_data, store  # noqa: E402
 

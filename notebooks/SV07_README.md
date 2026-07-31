@@ -73,17 +73,110 @@ API base URL is set in `app/frontend/.env`:
 VITE_API_URL=http://localhost:8000
 ```
 
-For production / Hugging Face (same origin), build with an empty `VITE_API_URL` so the UI calls `/api/...` on the same host.
+---
 
-### 3. Build for production
+## Vercel frontend ↔ Hugging Face FastAPI backend
+
+The React app on **Vercel** talks to FastAPI on a **Docker** Hugging Face Space (not the Gradio ZeroGPU demo). Gradio does not expose your `/api/*` JSON routes for the portfolio UI.
+
+```text
+Browser → https://your-app.vercel.app     (Vite/React)
+                │  fetch(`${VITE_API_URL}/api/...`)
+                ▼
+         https://<space>.hf.space         (FastAPI / Docker Space)
+                │
+                ▼
+         Dataset dtquocbao/SpatialVision-data
+```
+
+### 1. Create an API Space (Docker)
+
+1. [New Space](https://huggingface.co/new-space) → name e.g. `SpatialVision-api`
+2. **SDK: Docker** (not Gradio — Vercel needs REST `/api`)
+3. In the Space repo, use `Dockerfile.api` from this project as `Dockerfile` (copy/rename on that Space, or point a second sync workflow at it)
+4. Space settings → Variables / secrets:
+
+| Name | Value |
+|------|--------|
+| `HF_DATA_REPO` | `dtquocbao/SpatialVision-data` |
+| `DATA_DIR` | `/data/processed` |
+| `HF_TOKEN` | read token if Dataset is private |
+| `CORS_ORIGINS` | `*` (default) or `https://your-app.vercel.app` |
+
+5. Direct API host (use this in Vercel, **not** `huggingface.co/spaces/...`):
+
+```text
+https://dtquocbao-spatialvision-api.hf.space
+```
+
+(Exact host is shown on the Space page after build — lowercase, hyphenated.)
+
+Smoke-test:
+
+```bash
+curl https://dtquocbao-spatialvision-api.hf.space/api/health
+curl https://dtquocbao-spatialvision-api.hf.space/api/summary
+```
+
+OpenAPI: `https://dtquocbao-spatialvision-api.hf.space/docs`
+
+Local image test:
+
+```bash
+docker build -f Dockerfile.api -t spatialvision-api .
+docker run --rm -p 7860:7860 -e HF_TOKEN=%HF_TOKEN% spatialvision-api
+```
+
+### 2. Deploy frontend on Vercel
+
+From `app/frontend` (or set Vercel **Root Directory** to `app/frontend`):
+
+1. Import the GitHub repo in Vercel
+2. **Root Directory:** `app/frontend`
+3. Framework: Vite
+4. **Environment variable** (Production + Preview):
+
+| Name | Value |
+|------|--------|
+| `VITE_API_URL` | `https://dtquocbao-spatialvision-api.hf.space` |
+
+No trailing slash. Rebuild after changing env vars (`VITE_*` is baked in at build time).
+
+5. `vercel.json` is included for SPA client-side routing
 
 ```bash
 cd app/frontend
-VITE_API_URL= npm run build
-# Static assets in app/frontend/dist/
+# optional CLI deploy
+npx vercel --prod
 ```
 
-The backend serves `app/frontend/dist/` when present (override with env `FRONTEND_DIR`).
+### 3. CORS
+
+Backend already allows all origins and `https://*.vercel.app` via regex. To lock down:
+
+```bash
+CORS_ORIGINS=https://your-app.vercel.app
+```
+
+### 4. What not to do
+
+| Mistake | Why it fails |
+|---------|----------------|
+| Point `VITE_API_URL` at the Gradio Space | Gradio UI ≠ `/api/patients` JSON |
+| Use `https://huggingface.co/spaces/...` as API base | That’s the Hub page, not the app host |
+| Forget to rebuild Vercel after changing `VITE_API_URL` | Vite inlines env at build time |
+
+### 3. Build for production (local static)
+
+```bash
+cd app/frontend
+# same-origin (API serves UI):
+VITE_API_URL= npm run build
+# or point at HF API:
+# VITE_API_URL=https://dtquocbao-spatialvision-api.hf.space npm run build
+```
+
+The backend can serve `app/frontend/dist/` when present (override with env `FRONTEND_DIR`).
 
 ---
 

@@ -1,7 +1,6 @@
-# Minimal deps for SV07 FastAPI (local) and Gradio Hugging Face Space.
+# Minimal deps for SV07 FastAPI (local / Docker API Space).
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
-gradio>=5.0.0
 scanpy>=1.10.0
 anndata>=0.10.0
 pandas>=2.2.0,<3
@@ -9,3 +8,4 @@ numpy>=1.26.0,<2.5
 scipy>=1.11.0
 h5py>=3.10.0
 matplotlib>=3.8.0
+huggingface_hub>=0.26.0

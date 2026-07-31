@@ -24,13 +24,25 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(",")
+    if os.getenv("CORS_ORIGINS", "*") != "*"
+    else ["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ── Data paths ─────────────────────────────────────────────────────────────
 DATA_DIR = Path(os.getenv("DATA_DIR", "../data/processed"))
+
+# Pull missing files from HF Dataset when running on Spaces / empty DATA_DIR
+try:
+    from ensure_data import ensure_data_from_hub
+
+    DATA_DIR = ensure_data_from_hub(DATA_DIR)
+    os.environ["DATA_DIR"] = str(DATA_DIR)
+except Exception as _exc:  # noqa: BLE001
+    print(f"  ⚠ ensure_data_from_hub skipped: {_exc}")
 
 # ── Global data store (loaded once at startup) ─────────────────────────────
 store = {}
