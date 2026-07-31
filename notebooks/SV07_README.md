@@ -3,7 +3,7 @@
 Spatial transcriptomics platform for CRC immune exclusion analysis.
 
 - **Local / portfolio UI:** FastAPI + React under `app/`
-- **Hugging Face Space:** Gradio (`app.py`) — required for **ZeroGPU**
+- **Hugging Face Space:** Gradio + **ZeroGPU** (`demo` entry + `@spaces.GPU`; `/api/*` for Vercel)
 
 ```
 SpatialVision/
@@ -94,18 +94,18 @@ Browser → https://your-app.vercel.app
 
 `app.py` does `gr.mount_gradio_app(api_app, demo, path="/")` so `/api/shap` etc. work without Docker.
 
-### 1. Hugging Face Space (Gradio + ZeroGPU)
-
-On [Create a new Space](https://huggingface.co/new-space) (or keep existing `SpatialVision`):
+### 1. Hugging Face Space (Gradio + ZeroGPU — free tier)
 
 | Field | Value |
 |-------|--------|
 | Space name | `SpatialVision` |
-| SDK | **Gradio** (not Docker) |
+| SDK | **Gradio** (Docker is paid) |
 | Template | Blank |
-| Hardware | **ZeroGPU** (or CPU Basic) |
+| Hardware | **ZeroGPU** (free) |
 
-Do **not** create `SpatialVision-api`. Sync this repo with the existing Gradio workflow (`sync-to-hub.yml`).
+`app.py` keeps Gradio `demo` as the Space entry (required for ZeroGPU) and patches `/api/*` into Gradio’s FastAPI so Vercel still works. Do **not** use `gr.mount_gradio_app` as the entry — ZeroGPU then reports *No @spaces.GPU function detected*.
+
+Plot callbacks use `@spaces.GPU`. Sync with `sync-to-hub.yml`.
 
 Space secrets / variables:
 
@@ -181,17 +181,18 @@ Recreate `.h5ad` files by running notebooks SV01 → SV06. Small CSVs can stay i
 
 ---
 
-## Hugging Face Space + GitHub CI/CD (Gradio / ZeroGPU)
+## Hugging Face Space + GitHub CI/CD (Gradio)
 
 On every push to `main`, GitHub Actions mirrors this repo to a **Gradio** Space via [`huggingface/hub-sync`](https://github.com/huggingface/hub-sync).
 
-**ZeroGPU is Gradio-only** — `sdk: docker` will fail with *ZeroGPU is only available on Gradio SDK*. This repo uses:
+Use **CPU Basic** hardware (see above). Config:
 
 | Field | Value |
 |-------|--------|
 | `sdk` | `gradio` |
 | `app_file` | `app.py` |
 | `sdk_version` | `5.38.0` |
+| `suggested_hardware` | `cpu-basic` |
 
 Docs: [Spaces config](https://huggingface.co/docs/hub/spaces-config-reference) · [GitHub Actions](https://huggingface.co/docs/hub/spaces-github-actions)
 
@@ -223,7 +224,7 @@ short_description: CRC spatial transcriptomics — Gradio demo
 ---
 ```
 
-In Space **Settings → Hardware**, choose **ZeroGPU** or CPU. ZeroGPU requires `sdk: gradio`.
+In Space **Settings → Hardware**, choose **ZeroGPU** (free tier).
 
 #### 1. Create the Space (if needed)
 
@@ -257,15 +258,13 @@ Your data lives at [`dtquocbao/SpatialVision-data`](https://huggingface.co/datas
 
 No need to copy the 11 GB tree into the Space git repo — CI would also wipe non-git files on sync.
 
-**ZeroGPU:** plot callbacks use `@spaces.GPU` (required). First cold start may download large `.h5ad` files (~4 GB); later starts use the Hub cache when available.
-
-If downloads OOM or time out on ZeroGPU, switch hardware to **CPU basic** temporarily for the first successful data pull, or trim `REQUIRED_DATASETS` in `app.py` to only the files you need.
+First cold start downloads large `.h5ad` files (~4 GB); later starts use the Hub cache when available.
 
 #### 5. Trigger CI/CD
 
 ```bash
 git add app.py README.md requirements.txt requirements-lock.txt .github/workflows/sync-to-hub.yml
-git commit -m "Switch Hugging Face Space to Gradio for ZeroGPU"
+git commit -m "Gradio Space: CPU Basic + FastAPI mount for Vercel"
 git push origin main
 ```
 
@@ -278,14 +277,15 @@ push to main
     → hub-sync mirrors repo to the Space
     → HF installs requirements.txt (slim)
     → runs Gradio app.py
-    → ZeroGPU-compatible demo (spatial / SHAP / LIANA tabs)
+    → Gradio UI + FastAPI /api/* on CPU Basic
 ```
 
 ### Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| ZeroGPU only on Gradio | Set `sdk: gradio` + `app_file: app.py` (done in README) |
+| *No @spaces.GPU function detected* | Use Gradio `demo` entry (not `mount_gradio_app`); keep `@spaces.GPU` on plot fns |
+| Missing README YAML | Set `sdk: gradio` + `app_file: app.py` |
 | `short_description` invalid | Keep ≤ 60 characters |
 | Action auth failure | Refresh `HF_TOKEN` write scope |
 | Empty plots | Supply `data/processed` `.h5ad` / CSVs via Dataset or `DATA_DIR` |

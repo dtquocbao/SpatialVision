@@ -9,6 +9,7 @@ python_version: "3.12"
 app_file: app.py
 pinned: false
 short_description: CRC spatial transcriptomics — Gradio demo
+startup_duration_timeout: 1h
 datasets:
   - dtquocbao/SpatialVision-data
 tags:

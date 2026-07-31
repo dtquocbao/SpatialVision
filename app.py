@@ -1,11 +1,12 @@
 """
-SpatialVision — Hugging Face Gradio Space entrypoint (free tier / ZeroGPU).
+SpatialVision — Hugging Face Gradio Space (free tier: Gradio + ZeroGPU).
 
 Serves:
-  • Gradio UI at /
-  • FastAPI JSON at /api/*  (for Vercel frontend)
+  • Gradio UI (ZeroGPU entrypoint = `demo`)
+  • FastAPI JSON at /api/* for Vercel (routes patched into Gradio's FastAPI app)
 
-Docker is not required — mount FastAPI onto Gradio.
+Do NOT use gr.mount_gradio_app as the Space entry — ZeroGPU then fails with
+"No @spaces.GPU function detected". Keep `demo` as the only Gradio export.
 """
 
 from __future__ import annotations
@@ -14,18 +15,14 @@ import os
 import sys
 from pathlib import Path
 
-import gradio as gr
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-
+# ── ZeroGPU: register a GPU fn BEFORE heavy I/O so startup detection succeeds ─
 try:
     import spaces
-except ImportError:  # local runs without the Spaces runtime
+except ImportError:  # local machine without spaces package
     class _SpacesFallback:
         @staticmethod
         def GPU(fn=None, duration=60):
-            if fn is not None and callable(fn):
+            if callable(fn):
                 return fn
 
             def deco(f):
@@ -34,11 +31,21 @@ except ImportError:  # local runs without the Spaces runtime
             return deco
 
     spaces = _SpacesFallback()
+else:
+    @spaces.GPU(duration=5)
+    def _zerogpu_anchor():
+        """Visible to ZeroGPU at import time; also wired to demo.load below."""
+        return "ok"
+
+
+import gradio as gr
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "app"))
 
-# Avoid FastAPI SPA catch-all stealing Gradio routes if a local dist/ exists
 os.environ.setdefault("FRONTEND_DIR", "/tmp/spatialvision-no-frontend")
 
 from ensure_data import ensure_data_from_hub  # noqa: E402
@@ -50,7 +57,6 @@ DATA_DIR = ensure_data_from_hub(
 os.environ["DATA_DIR"] = str(DATA_DIR)
 DATA_REPO = os.environ.get("HF_DATA_REPO", "dtquocbao/SpatialVision-data")
 
-# Import after DATA_DIR is populated so load_data finds .h5ad files
 from SV07_backend_main import app as api_app, load_data, store  # noqa: E402
 
 load_data()
@@ -64,7 +70,7 @@ def _samples() -> list[str]:
     return samples if samples else ["(no spatial data — check dataset download)"]
 
 
-@spaces.GPU(duration=60)
+@spaces.GPU(duration=120)
 def plot_spatial(sample_id: str, color_by: str):
     spatial = store.get("spatial", {})
     if sample_id not in spatial:
@@ -112,7 +118,7 @@ def plot_spatial(sample_id: str, color_by: str):
     return fig
 
 
-@spaces.GPU(duration=30)
+@spaces.GPU(duration=60)
 def plot_shap(top_n: int):
     rows = store.get("shap_top50") or []
     fig, ax = plt.subplots(figsize=(7, 5))
@@ -131,7 +137,7 @@ def plot_shap(top_n: int):
     return fig
 
 
-@spaces.GPU(duration=30)
+@spaces.GPU(duration=60)
 def plot_liana_heatmap():
     heat = store.get("liana_niche_heatmap") or {}
     fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -196,6 +202,11 @@ def summary_md() -> str:
 with gr.Blocks(title="SpatialVision", theme=gr.themes.Soft()) as demo:
     gr.Markdown(summary_md())
 
+    # Hidden ZeroGPU keepalive (must be a Gradio-bound @spaces.GPU fn)
+    if "_zerogpu_anchor" in globals():
+        _ping_out = gr.Textbox(visible=False)
+        demo.load(_zerogpu_anchor, None, _ping_out)
+
     with gr.Tab("Spatial niches"):
         with gr.Row():
             sample = gr.Dropdown(choices=_samples(), value=_samples()[0], label="Sample")
@@ -228,10 +239,44 @@ with gr.Blocks(title="SpatialVision", theme=gr.themes.Soft()) as demo:
         "Code: [github.com/dtquocbao/SpatialVision](https://github.com/dtquocbao/SpatialVision)"
     )
 
+demo.queue(default_concurrency_limit=1)
 
-# HF Gradio Spaces: export FastAPI `app` with Gradio mounted so /api/* works for Vercel
-app = gr.mount_gradio_app(api_app, demo, path="/")
+
+# ── Patch Gradio's FastAPI factory so /api/* works without mount_gradio_app ─
+# ZeroGPU requires the Space entry to be Gradio `demo`, not a mounted FastAPI `app`.
+def _patch_gradio_api_routes() -> None:
+    import gradio.routes as gr_routes
+    from fastapi.middleware.cors import CORSMiddleware
+
+    orig = gr_routes.App.create_app
+
+    def create_app(*args, **kwargs):
+        # Support staticmethod / classmethod / plain function across Gradio versions
+        if isinstance(orig, staticmethod):
+            fastapi_app = orig.__func__(*args, **kwargs)
+        elif isinstance(orig, classmethod):
+            fastapi_app = orig.__func__(gr_routes.App, *args, **kwargs)
+        else:
+            fastapi_app = orig(*args, **kwargs)
+
+        # Prepend our FastAPI /api routes (health, shap, spatial, …)
+        fastapi_app.router.routes = list(api_app.router.routes) + list(
+            fastapi_app.router.routes
+        )
+        fastapi_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_origin_regex=r"https://.*\.vercel\.app",
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        return fastapi_app
+
+    gr_routes.App.create_app = create_app
+
+
+_patch_gradio_api_routes()
+
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7860)
