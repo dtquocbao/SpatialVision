@@ -1,6 +1,8 @@
 # Hugging Face Gradio Space + lightweight SV07 API deps.
 # Full research stack lockfile: requirements-lock.txt
 gradio==5.38.0
+spaces>=0.30.0
+huggingface_hub>=0.26.0
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 scanpy>=1.10.0

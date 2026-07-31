@@ -1,8 +1,8 @@
 """
 SpatialVision — Hugging Face Gradio Space entrypoint.
 
-ZeroGPU / Gradio SDK Spaces require sdk: gradio in README.md and this app_file.
-Local FastAPI + React remain under app/ for development.
+Pulls processed outputs from dataset dtquocbao/SpatialVision-data.
+ZeroGPU requires at least one @spaces.GPU-decorated function.
 """
 
 from __future__ import annotations
@@ -15,10 +15,77 @@ import gradio as gr
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from huggingface_hub import hf_hub_download
+
+try:
+    import spaces
+except ImportError:  # local runs without the Spaces runtime
+    class _SpacesFallback:
+        @staticmethod
+        def GPU(fn=None, duration=60):
+            if fn is not None and callable(fn):
+                return fn
+
+            def deco(f):
+                return f
+
+            return deco
+
+    spaces = _SpacesFallback()
 
 ROOT = Path(__file__).resolve().parent
-os.environ.setdefault("DATA_DIR", str(ROOT / "data" / "processed"))
+DATA_DIR = Path(os.environ.get("DATA_DIR", ROOT / "data" / "processed"))
+DATA_REPO = os.environ.get("HF_DATA_REPO", "dtquocbao/SpatialVision-data")
+
+# Files under dataset `processed/` needed by the Gradio demo
+REQUIRED_DATASETS = [
+    "processed/SV02_adata_niches.h5ad",
+    "processed/SV06_shap_values_top50.csv",
+    "processed/SV05_shap_validation_targets.csv",
+    "processed/SV03_boundary_exclusion_signature.csv",
+    "processed/SV06_model_metrics.csv",
+    "processed/SV06_adata_ml.h5ad",  # optional-ish; phenotype probabilities
+]
+
+os.environ["DATA_DIR"] = str(DATA_DIR)
 sys.path.insert(0, str(ROOT / "app"))
+
+
+def ensure_data_from_hub() -> None:
+    """Download missing processed files from the HF Dataset into DATA_DIR."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+
+    for rel in REQUIRED_DATASETS:
+        name = Path(rel).name
+        dest = DATA_DIR / name
+        if dest.exists():
+            print(f"  ✓ {name} (local)")
+            continue
+        print(f"  ↓ downloading {rel} from {DATA_REPO} ...")
+        try:
+            cached = hf_hub_download(
+                repo_id=DATA_REPO,
+                filename=rel,
+                repo_type="dataset",
+                token=token,
+            )
+            # Place a stable path under DATA_DIR for the backend loader
+            if Path(cached).resolve() != dest.resolve():
+                dest.unlink(missing_ok=True)
+                try:
+                    dest.hardlink_to(cached)
+                except OSError:
+                    import shutil
+                    shutil.copy2(cached, dest)
+            print(f"  ✓ {name}")
+        except Exception as exc:  # noqa: BLE001 — continue with partial data
+            print(f"  ⚠ skip {name}: {exc}")
+
+
+print(f"DATA_DIR={DATA_DIR}")
+print(f"HF_DATA_REPO={DATA_REPO}")
+ensure_data_from_hub()
 
 from SV07_backend_main import load_data, store  # noqa: E402
 
@@ -30,15 +97,20 @@ PATIENTS = store.get("patients", {})
 
 def _samples() -> list[str]:
     samples = store.get("samples") or []
-    return samples if samples else ["(no spatial data — set DATA_DIR)"]
+    return samples if samples else ["(no spatial data — check dataset download)"]
 
 
+@spaces.GPU(duration=60)
 def plot_spatial(sample_id: str, color_by: str):
     spatial = store.get("spatial", {})
     if sample_id not in spatial:
         fig, ax = plt.subplots(figsize=(5, 4))
-        ax.text(0.5, 0.5, "Spatial .h5ad not loaded\nUpload data or set DATA_DIR",
-                ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5, 0.5,
+            "Spatial .h5ad not loaded\n"
+            f"Expected in DATA_DIR or {DATA_REPO}",
+            ha="center", va="center", transform=ax.transAxes,
+        )
         ax.axis("off")
         return fig
 
@@ -76,6 +148,7 @@ def plot_spatial(sample_id: str, color_by: str):
     return fig
 
 
+@spaces.GPU(duration=30)
 def plot_shap(top_n: int):
     rows = store.get("shap_top50") or []
     fig, ax = plt.subplots(figsize=(7, 5))
@@ -94,6 +167,7 @@ def plot_shap(top_n: int):
     return fig
 
 
+@spaces.GPU(duration=30)
 def plot_liana_heatmap():
     heat = store.get("liana_niche_heatmap") or {}
     fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -146,11 +220,10 @@ def summary_md() -> str:
 | SHAP features | {n_shap} |
 | Boundary signature genes | {n_sig} |
 | XGBoost AUC | {metrics.get("AUC", "0.925")} |
+| Data repo | `{DATA_REPO}` |
 
 **Four-layer exclusion model (LIANA+):** CAF TGF-β → stromal ECM barrier (COL1A1/FN1)
 → invasive-margin chemokines (CXCL9/10/11) → CXCL12→CXCR4 stromal trapping.
-
-**Local API/UI:** FastAPI + React under `app/` · this Space is the Gradio demo (ZeroGPU-compatible).
 """
 
 
@@ -160,8 +233,11 @@ with gr.Blocks(title="SpatialVision", theme=gr.themes.Soft()) as demo:
     with gr.Tab("Spatial niches"):
         with gr.Row():
             sample = gr.Dropdown(choices=_samples(), value=_samples()[0], label="Sample")
-            color_by = gr.Radio(["niche", "infiltrated_probability"], value="niche",
-                                label="Color by")
+            color_by = gr.Radio(
+                ["niche", "infiltrated_probability"],
+                value="niche",
+                label="Color by",
+            )
         spatial_plot = gr.Plot(label="Visium spots")
         sample.change(plot_spatial, [sample, color_by], spatial_plot)
         color_by.change(plot_spatial, [sample, color_by], spatial_plot)
@@ -181,8 +257,9 @@ with gr.Blocks(title="SpatialVision", theme=gr.themes.Soft()) as demo:
         gr.Dataframe(patient_table(), label="Cohort metadata")
 
     gr.Markdown(
-        "Repo: [github.com/dtquocbao/SpatialVision](https://github.com/dtquocbao/SpatialVision) · "
-        "Setup: `notebooks/SV07_README.md`"
+        "Data: "
+        f"[`{DATA_REPO}`](https://huggingface.co/datasets/{DATA_REPO}) · "
+        "Code: [github.com/dtquocbao/SpatialVision](https://github.com/dtquocbao/SpatialVision)"
     )
 
 

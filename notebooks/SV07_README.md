@@ -161,11 +161,29 @@ Workflow uses `space_sdk: gradio` in `.github/workflows/sync-to-hub.yml`.
 
 Create a write token at [HF tokens](https://huggingface.co/settings/tokens), then add repo secret `HF_TOKEN`.
 
-#### 4. Provide processed data
+#### 4. Wire the Dataset to the Space
 
-`hub-sync` deletes Space files not in GitHub — do not one-off upload `.h5ad` into the Space git tree.
+Your data lives at [`dtquocbao/SpatialVision-data`](https://huggingface.co/datasets/dtquocbao/SpatialVision-data) under `processed/`.
 
-Prefer a Dataset (`dtquocbao/SpatialVision-data`) + download into `DATA_DIR` at startup, or keep only small CSVs in git.
+`app.py` downloads missing files from that Dataset into `DATA_DIR` (`data/processed` by default) on startup via `huggingface_hub.hf_hub_download`.
+
+| Space setting | Value |
+|---------------|--------|
+| README `datasets:` | `dtquocbao/SpatialVision-data` |
+| Env / secret `HF_DATA_REPO` | `dtquocbao/SpatialVision-data` (optional; this is the default) |
+| Env / secret `DATA_DIR` | `data/processed` (optional) |
+| Secret `HF_TOKEN` | Only if the Dataset is **private** (write/read token) |
+
+**Space → Settings → Variables and secrets**
+
+1. If the Dataset is private: add secret `HF_TOKEN` (HF read token that can access the Dataset).
+2. Optional variable: `HF_DATA_REPO=dtquocbao/SpatialVision-data`.
+
+No need to copy the 11 GB tree into the Space git repo — CI would also wipe non-git files on sync.
+
+**ZeroGPU:** plot callbacks use `@spaces.GPU` (required). First cold start may download large `.h5ad` files (~4 GB); later starts use the Hub cache when available.
+
+If downloads OOM or time out on ZeroGPU, switch hardware to **CPU basic** temporarily for the first successful data pull, or trim `REQUIRED_DATASETS` in `app.py` to only the files you need.
 
 #### 5. Trigger CI/CD
 

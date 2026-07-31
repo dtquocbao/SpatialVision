@@ -9,6 +9,8 @@ python_version: "3.12"
 app_file: app.py
 pinned: false
 short_description: CRC spatial transcriptomics — Gradio demo
+datasets:
+  - dtquocbao/SpatialVision-data
 tags:
   - spatial-transcriptomics
   - single-cell
