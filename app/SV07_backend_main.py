@@ -323,14 +323,19 @@ def get_summary():
     }
 
 
-# ── Serve React frontend in production ────────────────────────────────────
-FRONTEND_BUILD = Path(__file__).parent.parent / "frontend" / "build"
-if FRONTEND_BUILD.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD / "static")), name="static")
+# ── Serve React frontend in production (Vite → dist/) ─────────────────────
+FRONTEND_DIR = Path(os.getenv("FRONTEND_DIR", Path(__file__).parent / "frontend" / "dist"))
+if FRONTEND_DIR.exists():
+    assets_dir = FRONTEND_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
     @app.get("/{full_path:path}")
     def serve_frontend(full_path: str):
-        index = FRONTEND_BUILD / "index.html"
+        candidate = FRONTEND_DIR / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(str(candidate))
+        index = FRONTEND_DIR / "index.html"
         if index.exists():
             return FileResponse(str(index))
         return {"error": "Frontend not built"}

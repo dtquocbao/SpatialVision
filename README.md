@@ -95,7 +95,7 @@ Select the `spatialvision` conda environment as the kernel.
 | **SV04** Cell Type Deconvolution | Done | Cell2Location with Lee et al. 2020 CRC reference |
 | **SV05** Cell–Cell Communication | Done | LIANA+ bivariate LR analysis + NMF programs |
 | **SV06** Interpretable ML | Done | XGBoost + SHAP validation of exclusion programs |
-| **SV07** Interactive Platform | In progress | FastAPI + React app under `app/` |
+| **SV07** Interactive Platform | In progress | FastAPI + React in `app/`; Docker Space + GitHub Actions (`notebooks/SV07_README.md`) |
 
 ---
 

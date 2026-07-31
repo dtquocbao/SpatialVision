@@ -1,3 +1,9 @@
+# ── Node / frontend ──────────────────────────────────────────────────────────
+node_modules/
+app/frontend/node_modules/
+app/frontend/dist/
+npm-debug.log*
+
 # ── Downloaded / generated data (recreated by notebooks) ──────────────────────
 data/raw/**
 !data/raw/.gitkeep

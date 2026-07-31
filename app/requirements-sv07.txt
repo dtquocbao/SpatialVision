@@ -1,0 +1,9 @@
+# Minimal deps for the SV07 FastAPI service (Hugging Face Space / Docker).
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+scanpy>=1.10.0
+anndata>=0.10.0
+pandas>=2.2.0,<3
+numpy>=1.26.0,<2.5
+scipy>=1.11.0
+h5py>=3.10.0
