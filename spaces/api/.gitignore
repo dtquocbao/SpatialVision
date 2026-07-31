@@ -1,0 +1,5 @@
+# Keep deploy copies out of git; CI copies from app/ before hub-sync
+*
+!.gitignore
+!Dockerfile
+!README.md

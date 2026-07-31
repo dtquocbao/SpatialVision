@@ -91,10 +91,36 @@ Browser → https://your-app.vercel.app     (Vite/React)
 
 ### 1. Create an API Space (Docker)
 
-1. [New Space](https://huggingface.co/new-space) → name e.g. `SpatialVision-api`
-2. **SDK: Docker** (not Gradio — Vercel needs REST `/api`)
-3. In the Space repo, use `Dockerfile.api` from this project as `Dockerfile` (copy/rename on that Space, or point a second sync workflow at it)
-4. Space settings → Variables / secrets:
+> **If `https://dtquocbao-spatialvision-api.hf.space/...` returns Hub 404**, the Space
+> `dtquocbao/SpatialVision-api` does not exist yet (or never built). The Gradio demo
+> Space (`SpatialVision`) is separate and does **not** serve `/api/shap`.
+
+**Option A — GitHub Action (recommended)**
+
+1. Ensure repo secret `HF_TOKEN` has write access
+2. Run **Actions → Sync API Space (Docker) → Run workflow**
+3. Wait until [huggingface.co/spaces/dtquocbao/SpatialVision-api](https://huggingface.co/spaces/dtquocbao/SpatialVision-api) shows a running Docker build
+4. Set Space secrets: `HF_TOKEN` (if Dataset private), optional `HF_DATA_REPO=dtquocbao/SpatialVision-data`
+
+**Option B — create manually**
+
+1. [New Space](https://huggingface.co/new-space) → name `SpatialVision-api` → **SDK: Docker**
+2. Push contents of `spaces/api/` (plus copied `SV07_backend_main.py`, `ensure_data.py`, `requirements-sv07.txt` from `app/`) as the Space root
+3. Or run the workflow above after creating an empty Docker Space
+
+Direct API host (use in Vercel — **not** `huggingface.co/spaces/...`):
+
+```text
+https://dtquocbao-spatialvision-api.hf.space
+```
+
+Smoke-test **after** the Space is Running:
+
+```bash
+curl https://dtquocbao-spatialvision-api.hf.space/api/health
+curl https://dtquocbao-spatialvision-api.hf.space/api/shap
+curl https://dtquocbao-spatialvision-api.hf.space/docs
+```
 
 | Name | Value |
 |------|--------|
@@ -103,27 +129,12 @@ Browser → https://your-app.vercel.app     (Vite/React)
 | `HF_TOKEN` | read token if Dataset is private |
 | `CORS_ORIGINS` | `*` (default) or `https://your-app.vercel.app` |
 
-5. Direct API host (use this in Vercel, **not** `huggingface.co/spaces/...`):
-
-```text
-https://dtquocbao-spatialvision-api.hf.space
-```
-
-(Exact host is shown on the Space page after build — lowercase, hyphenated.)
-
-Smoke-test:
-
-```bash
-curl https://dtquocbao-spatialvision-api.hf.space/api/health
-curl https://dtquocbao-spatialvision-api.hf.space/api/summary
-```
-
-OpenAPI: `https://dtquocbao-spatialvision-api.hf.space/docs`
-
 Local image test:
 
 ```bash
-docker build -f Dockerfile.api -t spatialvision-api .
+# from repo root after copying app files into spaces/api (same as CI)
+cp app/SV07_backend_main.py app/ensure_data.py app/requirements-sv07.txt spaces/api/
+docker build -t spatialvision-api spaces/api
 docker run --rm -p 7860:7860 -e HF_TOKEN=%HF_TOKEN% spatialvision-api
 ```
 

@@ -1,0 +1,36 @@
+name: Sync API Space (Docker)
+
+# Creates/updates dtquocbao/SpatialVision-api for the Vercel frontend.
+# Gradio demo Space stays on sync-to-hub.yml → dtquocbao/SpatialVision.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/SV07_backend_main.py"
+      - "app/ensure_data.py"
+      - "app/requirements-sv07.txt"
+      - "spaces/api/**"
+      - ".github/workflows/sync-api-to-hub.yml"
+  workflow_dispatch:
+
+jobs:
+  sync-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage FastAPI Space files
+        run: |
+          cp app/SV07_backend_main.py app/ensure_data.py app/requirements-sv07.txt spaces/api/
+          ls -la spaces/api
+
+      - name: Sync → Hugging Face Docker Space
+        uses: huggingface/hub-sync@v0.1.0
+        with:
+          github_repo_id: ${{ github.repository }}
+          huggingface_repo_id: dtquocbao/SpatialVision-api
+          hf_token: ${{ secrets.HF_TOKEN }}
+          repo_type: space
+          space_sdk: docker
+          subdirectory: spaces/api
