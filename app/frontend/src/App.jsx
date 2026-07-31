@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 
-# Empty VITE_API_URL (Docker / HF Space) → same-origin /api/...; local default → :8000
+// Empty VITE_API_URL (Docker / HF Space) → same-origin /api/...; local default → :8000
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000"
 
 // ── Color maps ─────────────────────────────────────────────────────────────
