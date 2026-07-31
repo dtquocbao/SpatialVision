@@ -6,7 +6,7 @@ colorTo: green
 sdk: docker
 app_port: 7860
 pinned: false
-short_description: Spatial transcriptomics of CRC immune exclusion (FastAPI + React)
+short_description: CRC spatial transcriptomics — FastAPI + React app
 tags:
   - spatial-transcriptomics
   - single-cell
